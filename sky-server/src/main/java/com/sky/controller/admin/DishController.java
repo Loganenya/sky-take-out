@@ -32,7 +32,7 @@ public class DishController {
     @PostMapping
     @ApiOperation("新增菜品")
     public Result<String> save(@RequestBody DishDTO dishDTO) {
-        log.info("新增员工, {}", dishDTO);
+        log.info("新增菜品, {}", dishDTO);
         dishService.saveWithFlavor(dishDTO);
         return Result.success();
     }
@@ -88,5 +88,17 @@ public class DishController {
         log.info("修改菜品：{}", dishDTO);
         dishService.updateWithFlavor(dishDTO);
         return Result.success();
+    }
+
+    /**
+     * 根据分类id查询菜品
+     * @param categoryId
+     * @return
+     */
+    @GetMapping("/list")
+    @ApiOperation("根据分类id查询菜品")
+    public Result<List<Dish>> list(Long categoryId) {
+        List<Dish> list = dishService.list(categoryId);
+        return Result.success(list);
     }
 }
