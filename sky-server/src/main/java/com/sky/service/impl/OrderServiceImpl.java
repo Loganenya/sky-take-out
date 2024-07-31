@@ -1,6 +1,7 @@
 package com.sky.service.impl;
 
 
+import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.sky.constant.MessageConstant;
 import com.sky.context.BaseContext;
@@ -15,6 +16,7 @@ import com.sky.service.OrderService;
 import com.sky.utils.WeChatPayUtil;
 import com.sky.vo.OrderPaymentVO;
 import com.sky.vo.OrderSubmitVO;
+import com.sky.websocket.WebSocketServer;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -23,7 +25,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 订单
@@ -44,6 +48,8 @@ public class OrderServiceImpl implements OrderService {
     private UserMapper userMapper;
     @Autowired
     private WeChatPayUtil weChatPayUtil;
+    @Autowired
+    private WebSocketServer webSocketServer;
 
 
     public OrderSubmitVO submitOrder(OrdersSubmitDTO ordersSubmitDTO) {
@@ -206,5 +212,37 @@ public class OrderServiceImpl implements OrderService {
                 .build();
 
         orderMapper.update(orders);
+
+        //通过webSocketServer向客户端浏览器推送消息
+        //要求推送的消息格式是json类型，并且包含3个字段（type、orderId、content）
+        Map map = new HashMap();
+        map.put("type", 1);//消息类型，1表示来单提醒
+        map.put("orderId", orders.getId()); //订单的id
+        map.put("content", "订单号：" + outTradeNo);//订单号
+
+        //转化为json格式
+        String json = JSON.toJSONString(map);
+        //通过WebSocket实现来单提醒，向客户端浏览器推送消息(调用WebSocketServer类中群发的方法)
+        webSocketServer.sendToAllClient(json);
+
+    }
+
+    public void reminder(Long id) {
+        // 根据id查询订单
+        Orders ordersDB = orderMapper.getById(id);
+
+        // 校验订单是否存在
+        if (ordersDB == null ) {
+            throw new OrderBusinessException(MessageConstant.ORDER_STATUS_ERROR);
+        }
+
+        //基于WebSocket实现催单
+        Map map = new HashMap();
+        map.put("type", 2);//1表示来电提醒 2代表用户催单
+        map.put("orderId", id);//订单的id
+        map.put("content", "订单号：" + ordersDB.getNumber());//订单号
+
+        //参数需要json类型，所以需要进行转化(调用WebSocketServer组件中群发的方法)
+        webSocketServer.sendToAllClient(JSON.toJSONString(map));
     }
 }
